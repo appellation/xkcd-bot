@@ -1,0 +1,12 @@
+[package]
+name = "xkcd"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = ["./indexer", "./bot"]
+
+[dependencies]
+dotenvy = "0.15.6"
+serde = { version = "1.0.152", features = ["derive"] }
+twilight-model = "0.15"
