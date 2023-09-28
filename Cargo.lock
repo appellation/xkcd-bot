@@ -2153,6 +2153,7 @@ dependencies = [
  "futures",
  "meilisearch-sdk",
  "tokio",
+ "tracing",
  "tracing-subscriber",
  "twilight-gateway",
  "twilight-http",

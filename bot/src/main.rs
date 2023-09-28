@@ -3,6 +3,7 @@ use std::sync::Arc;
 use anyhow::{bail, ensure, Result};
 use futures::StreamExt;
 use meilisearch_sdk::{search::SearchResult, Client};
+use tracing::debug;
 use tracing_subscriber::EnvFilter;
 use twilight_gateway::{
 	stream::{self, ShardEventStream},
@@ -54,13 +55,14 @@ async fn main() -> Result<()> {
 				)
 				.await?;
 			}
-			ev => eprintln!("{:?}", ev),
+			ev => debug!(?ev),
 		}
 	}
 
 	Ok(())
 }
 
+#[tracing::instrument]
 async fn handle_interaction_create(
 	discord_app_id: Id<ApplicationMarker>,
 	search: Client,
@@ -89,6 +91,7 @@ async fn handle_interaction_create(
 	Ok(())
 }
 
+#[tracing::instrument(level = "debug")]
 async fn handle_xkcd(client: Client, data: CommandData) -> Result<InteractionResponse> {
 	let CommandDataOption { name, value } = &data.options[0];
 	ensure!(name == "query");
