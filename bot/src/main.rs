@@ -3,6 +3,7 @@ use std::sync::Arc;
 use anyhow::{bail, ensure, Result};
 use futures::StreamExt;
 use meilisearch_sdk::{search::SearchResult, Client};
+use tokio::spawn;
 use tracing::debug;
 use tracing_subscriber::EnvFilter;
 use twilight_gateway::{
@@ -47,13 +48,19 @@ async fn main() -> Result<()> {
 	while let Some((_, event)) = events.next().await {
 		match event {
 			Ok(Event::InteractionCreate(interaction)) => {
-				handle_interaction_create(
-					config.discord_id,
-					search.clone(),
-					rest.clone(),
-					interaction.0,
-				)
-				.await?;
+				let search = search.clone();
+				let rest = rest.clone();
+
+				spawn(async move {
+					// logged in span
+					let _ = handle_interaction_create(
+						config.discord_id,
+						search,
+						rest,
+						interaction.0,
+					)
+					.await;
+				});
 			}
 			ev => debug!(?ev),
 		}
@@ -62,7 +69,7 @@ async fn main() -> Result<()> {
 	Ok(())
 }
 
-#[tracing::instrument]
+#[tracing::instrument(err)]
 async fn handle_interaction_create(
 	discord_app_id: Id<ApplicationMarker>,
 	search: Client,
