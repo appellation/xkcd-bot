@@ -121,13 +121,42 @@ async fn handle_xkcd(client: Client, data: CommandData) -> Result<InteractionRes
 				}),
 			})
 		}
-		CommandOptionValue::String(num) => Ok(InteractionResponse {
-			kind: InteractionResponseType::ChannelMessageWithSource,
-			data: Some(InteractionResponseData {
-				content: Some(format!("https://xkcd.com/{}/", num)),
-				..Default::default()
-			}),
-		}),
+		CommandOptionValue::String(id_or_query) => {
+			if id_or_query.chars().all(|ch| ch.is_digit(10)) {
+				Ok(InteractionResponse {
+					kind: InteractionResponseType::ChannelMessageWithSource,
+					data: Some(InteractionResponseData {
+						content: Some(format!("https://xkcd.com/{}/", id_or_query)),
+						..Default::default()
+					}),
+				})
+			} else {
+				let results = client
+					.index("comics")
+					.search()
+					.with_query(id_or_query)
+					.with_limit(5)
+					.execute::<Comic>()
+					.await?;
+
+				Ok(InteractionResponse {
+					kind: InteractionResponseType::ChannelMessageWithSource,
+					data: Some(InteractionResponseData {
+						content: Some(
+							results
+								.hits
+								.into_iter()
+								.map(|SearchResult { result, .. }| {
+									format!("{}: <https://xkcd.com/{}/>", result.title, result.num)
+								})
+								.collect::<Vec<_>>()
+								.join("\n"),
+						),
+						..Default::default()
+					}),
+				})
+			}
+		}
 		_ => bail!("unexpected command data value"),
 	}
 }
