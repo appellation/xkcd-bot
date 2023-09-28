@@ -62,14 +62,14 @@ async fn main() -> Result<()> {
 					.await;
 				});
 			}
-			ev => debug!(?ev),
+			event => debug!(?event),
 		}
 	}
 
 	Ok(())
 }
 
-#[tracing::instrument(err)]
+#[tracing::instrument(err, skip(rest, interaction))]
 async fn handle_interaction_create(
 	discord_app_id: Id<ApplicationMarker>,
 	search: Client,
