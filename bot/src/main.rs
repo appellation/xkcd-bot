@@ -4,7 +4,7 @@ use anyhow::{bail, ensure, Result};
 use futures::StreamExt;
 use meilisearch_sdk::{search::SearchResult, Client};
 use tokio::spawn;
-use tracing::debug;
+use tracing::{debug, info, trace};
 use tracing_subscriber::EnvFilter;
 use twilight_gateway::{
 	stream::{self, ShardEventStream},
@@ -32,7 +32,7 @@ async fn main() -> Result<()> {
 		.init();
 
 	let config = Config::load();
-	let search = Client::new(config.meilisearch_url, config.meilisearch_api_key);
+	let search = Client::new(config.meilisearch_url, Some(config.meilisearch_api_key));
 
 	let rest = Arc::new(twilight_http::Client::new(config.discord_token.clone()));
 	let mut shards = stream::create_recommended(
@@ -45,6 +45,8 @@ async fn main() -> Result<()> {
 
 	let mut events = ShardEventStream::new(shards.iter_mut());
 
+	info!("ready");
+
 	while let Some((_, event)) = events.next().await {
 		match event {
 			Ok(Event::InteractionCreate(interaction)) => {
@@ -53,13 +55,9 @@ async fn main() -> Result<()> {
 
 				spawn(async move {
 					// logged in span
-					let _ = handle_interaction_create(
-						config.discord_id,
-						search,
-						rest,
-						interaction.0,
-					)
-					.await;
+					let _ =
+						handle_interaction_create(config.discord_id, search, rest, interaction.0)
+							.await;
 				});
 			}
 			event => debug!(?event),
@@ -69,7 +67,7 @@ async fn main() -> Result<()> {
 	Ok(())
 }
 
-#[tracing::instrument(err, skip(rest, interaction))]
+#[tracing::instrument(err, skip_all)]
 async fn handle_interaction_create(
 	discord_app_id: Id<ApplicationMarker>,
 	search: Client,
@@ -98,13 +96,15 @@ async fn handle_interaction_create(
 	Ok(())
 }
 
-#[tracing::instrument(level = "debug")]
+#[tracing::instrument(err, skip_all, fields(options = ?data.options))]
 async fn handle_xkcd(client: Client, data: CommandData) -> Result<InteractionResponse> {
 	let CommandDataOption { name, value } = &data.options[0];
 	ensure!(name == "query");
 
 	match value {
 		CommandOptionValue::Focused(query, CommandOptionType::String) => {
+			info!(query);
+
 			let results = client
 				.index("comics")
 				.search()
@@ -112,6 +112,9 @@ async fn handle_xkcd(client: Client, data: CommandData) -> Result<InteractionRes
 				.with_limit(20)
 				.execute::<Comic>()
 				.await?;
+
+			debug!(result_hits = results.hits.len());
+			trace!(?results);
 
 			Ok(InteractionResponse {
 				kind: InteractionResponseType::ApplicationCommandAutocompleteResult,
@@ -132,6 +135,8 @@ async fn handle_xkcd(client: Client, data: CommandData) -> Result<InteractionRes
 			})
 		}
 		CommandOptionValue::String(id_or_query) => {
+			info!(id_or_query);
+
 			if id_or_query.chars().all(|ch| ch.is_digit(10)) {
 				Ok(InteractionResponse {
 					kind: InteractionResponseType::ChannelMessageWithSource,
@@ -148,6 +153,9 @@ async fn handle_xkcd(client: Client, data: CommandData) -> Result<InteractionRes
 					.with_limit(5)
 					.execute::<Comic>()
 					.await?;
+
+				trace!(?results);
+				debug!(result_hits = ?results.total_hits);
 
 				Ok(InteractionResponse {
 					kind: InteractionResponseType::ChannelMessageWithSource,

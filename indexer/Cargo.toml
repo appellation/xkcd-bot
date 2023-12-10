@@ -7,8 +7,9 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.68"
+async-recursion = "1.0.5"
 clokwerk = "0.4.0"
-meilisearch-sdk = { version = "0.21.2", default-features = false }
+meilisearch-sdk = { version = "0.24.3", default-features = false }
 reqwest = { version = "0.11.13", default-features = false, features = [
 	"json",
 	"rustls-tls",

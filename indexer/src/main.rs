@@ -19,7 +19,7 @@ async fn main() -> Result<()> {
 	let mut scheduler = AsyncScheduler::new();
 	let config = Config::load();
 
-	let client = Client::new(config.meilisearch_url, config.meilisearch_api_key);
+	let client = Client::new(config.meilisearch_url, Some(config.meilisearch_api_key));
 	index_comics(&client).await?;
 
 	scheduler.every(1.day()).at("1:00 am").run(move || {

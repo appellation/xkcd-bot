@@ -3,7 +3,7 @@ use std::env;
 use serde::{Deserialize, Serialize};
 use twilight_model::id::{marker::ApplicationMarker, Id};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Comic {
 	pub month: String,
 	pub num: usize,

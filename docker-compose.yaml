@@ -1,14 +1,13 @@
 version: "3.9"
 services:
   meilisearch:
-    image: getmeili/meilisearch
+    image: getmeili/meilisearch:v1.5
     networks:
       - search
     restart: unless-stopped
     volumes:
-      - search-data:/data.ms
+      - search-data:/meili_data
     environment:
-      MEILI_DB_PATH: /data.ms
       MEILI_MASTER_KEY: test
     expose:
       - "7700"
@@ -22,7 +21,8 @@ services:
     env_file: .env
     environment:
       MEILISEARCH_URL: http://meilisearch:7700
-      RUST_LOG: info
+      RUST_LOG: warn,xkcd_bot=info
+    restart: unless-stopped
 
   indexer:
     build:
@@ -33,7 +33,8 @@ services:
     env_file: .env
     environment:
       MEILISEARCH_URL: http://meilisearch:7700
-      RUST_LOG: info,xkcd_indexer=debug
+      RUST_LOG: warn,xkcd_indexer=info
+    restart: unless-stopped
 
 networks:
   search:
