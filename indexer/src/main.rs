@@ -4,7 +4,7 @@ use anyhow::Result;
 use clokwerk::{AsyncScheduler, Job, TimeUnits};
 use meilisearch_sdk::Client;
 use tokio::time::sleep;
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 use xkcd::Config;
 use xkcd_indexer::index_comics;
 
@@ -13,6 +13,7 @@ async fn main() -> Result<()> {
 	tracing_subscriber::fmt()
 		.with_env_filter(EnvFilter::from_default_env())
 		.with_level(true)
+		.with_span_events(FmtSpan::NEW | FmtSpan::CLOSE)
 		.init();
 
 	let mut scheduler = AsyncScheduler::new();

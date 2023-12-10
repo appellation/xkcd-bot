@@ -1,4 +1,4 @@
-version: '3.9'
+version: "3.9"
 services:
   meilisearch:
     image: getmeili/meilisearch
@@ -11,29 +11,29 @@ services:
       MEILI_DB_PATH: /data.ms
       MEILI_MASTER_KEY: test
     expose:
-      - '7700'
+      - "7700"
 
   bot:
     build:
-      context: '.'
+      context: "."
       dockerfile: bot/Dockerfile
     networks:
       - search
     env_file: .env
     environment:
       MEILISEARCH_URL: http://meilisearch:7700
-      RUST_LOG: debug
+      RUST_LOG: info
 
   indexer:
     build:
-      context: '.'
+      context: "."
       dockerfile: indexer/Dockerfile
     networks:
       - search
     env_file: .env
     environment:
       MEILISEARCH_URL: http://meilisearch:7700
-      RUST_LOG: debug
+      RUST_LOG: info,xkcd_indexer=debug
 
 networks:
   search:

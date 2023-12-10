@@ -1,9 +1,7 @@
 use anyhow::{Context, Error, Result};
-use meilisearch_sdk::{
-	documents::{DocumentsQuery, DocumentsResults},
-	Client,
-};
+use meilisearch_sdk::{indexes::Index, search::SearchResult, Client};
 use tokio::task::JoinSet;
+use tracing::{Instrument, Span};
 use xkcd::Comic;
 
 const RANGKING_RULES: [&'static str; 7] = [
@@ -16,6 +14,7 @@ const RANGKING_RULES: [&'static str; 7] = [
 	"num:desc",
 ];
 
+#[tracing::instrument(err, fields(end_num))]
 async fn load_comics(start_num: usize) -> Result<Vec<Comic>> {
 	let client = reqwest::Client::new();
 	let first = client
@@ -25,7 +24,10 @@ async fn load_comics(start_num: usize) -> Result<Vec<Comic>> {
 		.json::<Comic>()
 		.await?;
 
+	Span::current().record("end_num", first.num);
+
 	if start_num == first.num {
+		tracing::info!("Up-to-date; stopping loading");
 		return Ok(vec![]);
 	}
 
@@ -34,22 +36,25 @@ async fn load_comics(start_num: usize) -> Result<Vec<Comic>> {
 	for num in start_num..first.num {
 		let client = client.clone();
 
-		set.spawn(async move {
-			let res = client
-				.get(format!("https://xkcd.com/{}/info.0.json", num))
-				.send()
-				.await?;
+		set.spawn(
+			async move {
+				let res = client
+					.get(format!("https://xkcd.com/{}/info.0.json", num))
+					.send()
+					.await?;
 
-			Ok::<_, Error>(if res.status().is_success() {
-				Some(
-					res.json::<Comic>()
-						.await
-						.context(format!("comic num {}", num))?,
-				)
-			} else {
-				None
-			})
-		});
+				Ok::<_, Error>(if res.status().is_success() {
+					Some(
+						res.json::<Comic>()
+							.await
+							.context(format!("comic num {}", num))?,
+					)
+				} else {
+					None
+				})
+			}
+			.instrument(tracing::debug_span!("load_comic", num)),
+		);
 	}
 
 	let mut comics = Vec::with_capacity(set.len() + 1);
@@ -64,24 +69,56 @@ async fn load_comics(start_num: usize) -> Result<Vec<Comic>> {
 	Ok(comics)
 }
 
+#[tracing::instrument(skip_all, err)]
+async fn configure_index(client: &Client, index: &Index) -> Result<()> {
+	index
+		.set_ranking_rules(RANGKING_RULES)
+		.await?
+		.wait_for_completion(&client, None, None)
+		.await?;
+
+	index
+		.set_sortable_attributes(["num"])
+		.await?
+		.wait_for_completion(&client, None, None)
+		.await?;
+
+	Ok::<_, Error>(())
+}
+
+#[tracing::instrument(skip_all, err, fields(num_comics = comics.len()))]
+async fn add_documents(client: &Client, index: &Index, comics: &[Comic]) -> Result<()> {
+	index
+		.add_documents(comics, Some("num"))
+		.await?
+		.wait_for_completion(&client, None, None)
+		.await?;
+
+	Ok(())
+}
+
+#[tracing::instrument(skip_all, err)]
 pub async fn index_comics(client: &Client) -> Result<()> {
 	let comics_idx = client.index("comics");
-	let start_num = comics_idx
-		.get_documents_with::<Comic>(DocumentsQuery::new(&comics_idx).with_limit(1))
-		.await
-		.map(|DocumentsResults { results, .. }| results)
-		.unwrap_or(vec![])
+	configure_index(client, &comics_idx).await?;
+
+	let results = comics_idx
+		.search()
+		.with_sort(&["num:desc"])
+		.with_limit(1)
+		.execute::<Comic>()
+		.await?;
+
+	let start_num = results
+		.hits
 		.get(0)
-		.map(|comic| comic.num)
+		.map(|SearchResult { result, .. }| result.num)
 		.unwrap_or(1);
 
 	let comics = load_comics(start_num).await?;
-
-	let task = comics_idx.add_documents(&comics, Some("num")).await?;
-	client.wait_for_task(task, None, None).await?;
-
-	let task = comics_idx.set_ranking_rules(RANGKING_RULES).await?;
-	client.wait_for_task(task, None, None).await?;
+	if comics.len() > 0 {
+		add_documents(&client, &comics_idx, &comics).await?;
+	}
 
 	Ok(())
 }

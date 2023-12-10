@@ -2286,6 +2286,7 @@ dependencies = [
  "meilisearch-sdk",
  "reqwest",
  "tokio",
+ "tracing",
  "tracing-subscriber",
  "xkcd",
 ]
