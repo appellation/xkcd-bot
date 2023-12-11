@@ -25,8 +25,6 @@ pub struct Config {
 	pub meilisearch_api_key: String,
 }
 
-const MEILISEARCH_API_KEY: &'static str = "test";
-
 impl Config {
 	pub fn load() -> Self {
 		let _ = dotenvy::dotenv();
@@ -39,7 +37,7 @@ impl Config {
 				.unwrap(),
 			meilisearch_url: env::var("MEILISEARCH_URL")
 				.unwrap_or("http://localhost:7700".to_string()),
-			meilisearch_api_key: MEILISEARCH_API_KEY.to_string(),
+			meilisearch_api_key: env::var("MEILISEARCH_API_KEY").unwrap_or("test".to_string()),
 		}
 	}
 }

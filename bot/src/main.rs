@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{bail, ensure, Result};
+use anyhow::{bail, ensure, Context, Result};
 use futures::StreamExt;
 use meilisearch_sdk::{search::SearchResult, Client};
 use tokio::spawn;
@@ -40,7 +40,8 @@ async fn main() -> Result<()> {
 		twilight_gateway::Config::new(config.discord_token, Intents::empty()),
 		|_, builder| builder.build(),
 	)
-	.await?
+	.await
+	.context("failed to create shards")?
 	.collect::<Vec<_>>();
 
 	let mut events = ShardEventStream::new(shards.iter_mut());

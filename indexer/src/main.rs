@@ -1,9 +1,8 @@
 use std::time::Duration;
 
 use anyhow::Result;
-use clokwerk::{AsyncScheduler, Job, TimeUnits};
 use meilisearch_sdk::Client;
-use tokio::time::sleep;
+use tokio::time::interval;
 use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
 use xkcd::Config;
 use xkcd_indexer::index_comics;
@@ -16,21 +15,13 @@ async fn main() -> Result<()> {
 		.with_span_events(FmtSpan::NEW | FmtSpan::CLOSE)
 		.init();
 
-	let mut scheduler = AsyncScheduler::new();
 	let config = Config::load();
 
 	let client = Client::new(config.meilisearch_url, Some(config.meilisearch_api_key));
-	index_comics(&client).await?;
-
-	scheduler.every(1.day()).at("1:00 am").run(move || {
-		let client = client.clone();
-		async move {
-			index_comics(&client).await.unwrap();
-		}
-	});
+	let mut interval = interval(Duration::from_secs(21_600)); // 6 hrs
 
 	loop {
-		scheduler.run_pending().await;
-		sleep(Duration::from_millis(500)).await;
+		interval.tick().await;
+		index_comics(&client).await?;
 	}
 }
